@@ -11,7 +11,7 @@ The equation is given by
 a^2+b^2=c^2
 ```
 
-![\sum_{\forall i}{x_i^{2}}](https://latex.codecogs.com/svg.latex?%5Csum_%7B%5Cforall+i%7D%7Bx_i%5E%7B2%7D%7D)
+![\frac{d{x_i}}{dt} = G_i(\mathbf{x}) x_i \left( 1-\Sigma_j x_j/K \right) D_i(\mathbf{x}) x_i](https://latex.codecogs.com/svg.latex?%5Csum_%7B%5Cforall+i%7D%7Bx_i%5E%7B2%7D%7D)
 
 Especially, the species living in the model share resources which are limited such as habitat and water resources, so-called Resource Limitation.
 
