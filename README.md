@@ -20,11 +20,11 @@ g++ -g OES_model.cpp OES_packages/*.c -o OES_model.out
 ./OES_model.out <date(yymmdd)> <sigma> <mutant event time> <saturation time> <dt or K> <alpha>
 ```
 \<date(yymmdd)\> is a folder name that will be saved output files.
-\<sigma\> and \<alpha\> mean the interaction stregnth among species and the invasion rate of new species.
+\<sigma\> and \<alpha\> mean the interaction strength among species and the invasion rate of new species.
 \<mutant event time\> and \<saturation time\> are related to our simulation time. 
 The former indicates how many species invade the system. 
 The latter means how long the code runs more without the invasion after the invasion finishes.
-\<dt or K\> is an unit time step of the code.
+\<dt or K\> is a unit time step of the code.
 
 # The output files
 The code generates four types of output files when to finish.
