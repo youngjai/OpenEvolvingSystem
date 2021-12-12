@@ -6,9 +6,10 @@ To examine how the diversity of the system changes depending on these features, 
 The dynamics of our model follows as the Lotka-Volterra type equation.
 The equation is given by
 
-![formula](https://render.githubusercontent.com/render/math?math=\frac{d{x_i}}{dt} = G_i(\mathbf{x}) x_i \left( 1-\Sigma_j x_j/K \right) D_i(\mathbf{x}) x_i)
-
-$ \frac{d{x_i}}{dt} = G_i(\mathbf{x}) x_i \left( 1-\Sigma_j x_j/K \right) D_i(\mathbf{x}) x_i $
+```math
+$$ \frac{d{x_i}}{dt} = G_i(\mathbf{x}) x_i \left( 1-\Sigma_j x_j/K \right) D_i(\mathbf{x}) x_i $$
+a^2+b^2=c^2
+```
 Especially, the species living in the model share resources which are limited such as habitat and water resources, so-called Resource Limitation.
 
 
