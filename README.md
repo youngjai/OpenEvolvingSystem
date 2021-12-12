@@ -6,7 +6,7 @@ To examine how the diversity of the system changes depending on these features, 
 The dynamics of our model follows as the Lotka-Volterra type equation.
 The equation is given by
 
-![equation](https://latex.codecogs.com/gif.latex?%5Cfrac%7Bd%7Bx_i%7D%7D%7Bdt%7D%3DG_i%28%5Cmathbf%7Bx%7D%29%5C%3Ax_i%5Cleft%281-%5CSigma_jx_j/K%5Cright%29&plus;D_i%28%5Cmathbf%7Bx%7D%29%5C%3Ax_i)
+![equation](https://latex.codecogs.com/gif.latex?%5Cfrac%7Bd%7Bx_i%7D%7D%7Bdt%7D%3DG_i%28%5Cmathbf%7Bx%7D%29%5C%3Ax_i%5Cleft%281-%5CSigma_jx_j/K%5Cright%29&plus;D_i%28%5Cmathbf%7Bx%7D%29%5C%3Ax_i) .
 
 Especially, the species living in the model share resources which are limited such as habitat and water resources, so-called Resource Limitation.
 
