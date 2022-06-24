@@ -60,7 +60,7 @@ void time_end(clock_t begin, char *path);
 int *shuffle_array_int(int length, unsigned long seed);
 extern int call; // double normal_dist(double avg, double stdev, unsigned long seed)
 
-// from networkYJ.c
+// from networkYJ.cpp
 void initial_SPP_network(Network& network, Parameters& paras);
 void free_node_list(Node_list *&node_list);
 void create_node(Network& network, Parameters& paras);
