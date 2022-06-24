@@ -133,48 +133,90 @@ int *shuffle_array_int(int length, unsigned long seed)
 	return shuffle;
 }
 
-double RK4(double x, double t, double h, double *&values, double (*f)(double, double, double*))
-{
-	double h2 = 0.5*h;
-	double k1 = f(x, t, values);
-	double k2 = f(x+h2*k1, t+h2, values);
-	double k3 = f(x+h2*k2, t+h2, values);
-	double k4 = f(x+h*k3, t+h, values);
-
-	return x + h/6.*(k1+2.*k2+2.*k3+k4);
-}
-
-void Adaptive_RK4_h(double *&x, int x_size, double t, double& h, double **&values, double (*f)(double, double, double*))
+double *RK4(double *f, double t, double h, Network network, double *(*dfdt)(double *, double, Network))
 {
 	int i;
-	double *x_next1 = (double *) calloc(x_size, sizeof(double));
-	double *x_next2 = (double *) calloc(x_size, sizeof(double));
-	double x_del;
-	double rho = 0.;
-	double accuracy = 1e-12; // target accuracy
-	// If the difference between two results is less than 'precision', these are same.
-	double precision = 1e-6; // 소수 6번째 자리까지 정도 확인
+	double h2 = 0.5*h;
 
-	while(rho<1.-precision){
-		x_del = 0.; 
-		for(i=0; i<x_size; i++){
-			x_next1[i] = RK4(RK4(x[i], 0, h, values[i], f), 0, h, values[i], f);
-			x_next2[i] = RK4(x[i], 0, 2.*h, values[i], f);
-			x_del += fabs(x_next1[i]-x_next2[i]);
-		}
-		if(x_del < precision){
-			h *= 2.;
-			rho = 10.;
+	double **k = (double **) calloc(4, sizeof(double *));
+
+	// RK4
+	// k1 = f(x,t)
+	// k2 = f(x+h2*k1, t+h2)
+	// k3 = f(x+h2*k2, t+h2)
+	// k4 = f(x+h*k3, t+h)
+	// x += h/6 * (k1 + 2k2 + 2k3 + k4)
+	double *f_rk4 = (double *) calloc(network.nodes, sizeof(double));
+
+	// k1
+	k[0] = dfdt(f, t, network);
+
+	// k2
+	for(i=0; i<network.nodes; i++) f_rk4[i] = f[i]+h2*k[0][i];
+	k[1] = dfdt(f_rk4, t+h2, network);
+
+	// k3
+	for(i=0; i<network.nodes; i++) f_rk4[i] = f[i]+h2*k[1][i];
+	k[2] = dfdt(f_rk4, t+h2, network);
+
+	// k4
+	for(i=0; i<network.nodes; i++) f_rk4[i] = f[i]+h*k[2][i];
+	k[3] = dfdt(f_rk4, t+h, network);
+
+	// RK4 array
+	for(i=0; i<network.nodes; i++)
+		f_rk4[i] = f[i] + h/6.*(k[0][i]+2.*k[1][i]+2.*k[2][i]+k[3][i]);
+
+	for(i=0; i<4; i++) free(k[i]);
+	free(k);
+
+	return f_rk4;
+}
+
+double *Adaptive_RK4(double *f, double t, double &h, Network network, double *(*dfdt)(double *, double, Network))
+{
+	int i;
+	double *f1 = NULL;
+	double *f_tmp, *f2;
+	double f_del;
+	double rho = 0.;
+	// If the difference between two results is less than 'precision', these are same.
+	double acc = 1e-8; // target accuracy
+	double pre = 1e-14; // 소수 14번째 자리까지 정도 확인
+
+	while(rho<1.-pre){
+		f_del = 0.; 
+
+		if(f1 != NULL){ delete f1; delete f_tmp; delete f2; }
+		f_tmp = RK4(f, t, h, network, dfdt);
+		f1 = RK4(f_tmp, t+h, h, network, dfdt);
+		f2 = RK4(f, t+2.*h, 2.*h, network, dfdt);
+
+		// To measure the Euclidean distance in f dynamics space
+		for(i=0; i<network.nodes; i++) f_del += (f1[i]-f2[i])*(f1[i]-f2[i]);
+		f_del = sqrt(f_del);
+
+		// If f_del is too small, we replace f_del as precision.
+		if(f_del < pre){ 
+			rho = 10.; h *= 2.;
 		}
 		else{
-			rho = 30.*h*accuracy/x_del;
+			// If f_del is diverse, we replace f_del as one over precision.
+			if((isnan(f_del)) || (isinf(f_del))) f_del = 1./pre;
+			rho = 30.*h*acc/f_del;
 
-			if(rho<1.-precision) h *= pow(rho, 0.25);
+			if(rho<1.-pre) h *= pow(rho, 0.25);
 			else h *= 2.;
 		}
 	}
-	for(i=0; i<x_size; i++) x[i] = x_next1[i]+(x_next1[i]-x_next2[i])/15.;
-	free(x_next1); free(x_next2);
+
+	// adaptive RK4 array
+	double *f_adap = (double *) calloc(network.nodes, sizeof(double));
+	for(i=0; i<network.nodes; i++) f_adap[i] = f1[i] + (f1[i]-f2[i])/15.;
+
+	free(f1); free(f_tmp); free(f2);
+
+	return f_adap;
 }
 
 void free_node_list(Node_list *&node_list)
