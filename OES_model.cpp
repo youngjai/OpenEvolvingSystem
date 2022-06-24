@@ -58,8 +58,6 @@ typedef struct {
 clock_t time_begin(char *path);
 void time_end(clock_t begin, char *path);
 int *shuffle_array_int(int length, unsigned long seed);
-double RK4(double x, double t, double h, double *&values, double (*f)(double, double, double*));
-void Adaptive_RK4_h(double *&x, int x_size, double t, double& h, double **&values, double (*f)(double, double, double*));
 extern int call; // double normal_dist(double avg, double stdev, unsigned long seed)
 
 // from networkYJ.c
@@ -68,12 +66,15 @@ void free_node_list(Node_list *&node_list);
 void create_node(Network& network, Parameters& paras);
 void create_connection(Network& network, Parameters& paras, int name_i, int name_j);
 
+double *RK4(double *f, double t, double h, Network network, double *(*dfdt)(double *, double, Network));
+double *Adaptive_RK4(double *f, double t, double &h, Network network, double *(*dfdt)(double *, double, Network));
+
 // In this c file
 void simul_SPP_model(Parameters& paras, double **&results, double **&network_edges, int *&num_of_S);
 void competitive_dynamics(Network& network, Parameters& paras, double& h, double t_i, double t_f);
 void appear_new_node(Network& network, Parameters& paras);
 void remove_a_node(double t, Network& network, Parameters& paras);
-double differential_eq_of_x(double x, double t, double *values);
+double *dfdt(double *f, double t, Network network);
 void save_parameters(Parameters& paras, char *path);
 void print_results(Parameters& paras, double **&results, double **&network_edges, \
 	int len_rows, int len_columns, int len_links, char *path);
@@ -235,61 +236,40 @@ void simul_SPP_model(Parameters& paras, double **&results, double **&network_edg
 
 void competitive_dynamics(Network& network, Parameters& paras, double& h, double t_i, double t_f)
 {
-	int i, j, k;
-	// values[i][0]: total abundance
-	// values[i][1]: f_plus
-	// values[i][2]: f_minus
-	double **values = (double **) calloc(network.nodes, sizeof(double *));
-	for(i=0; i<network.nodes; i++){
-		values[i] = (double *) calloc(3, sizeof(double));
-	}
-	// record the node name and their abundance
-	double sum_ab = 0.;
-	int *index_list = (int *) calloc(network.nodes, sizeof(int)); 
-	double *x_list = (double *) calloc(network.nodes, sizeof(double));
+	int i;
 
-	// calculate the total abundance
+	double *f = (double *) calloc(network.nodes, sizeof(double));
+	double *f_tmp;
 	Node *cursor = network.node_list->head; i = 0; 
 	while(cursor->next != NULL){
 		cursor = cursor->next;
-		sum_ab += cursor->abundance;
-		index_list[i] = cursor->node_name;
-		x_list[i] = cursor->abundance;
+		f[i] = cursor->abundance; i++;
+	} cursor = NULL;
 
-		values[i][1] = cursor->self_loop * cursor->abundance; values[i++][2] = 0.; 
+	// Adaptive RK4
+	f_tmp = Adaptive_RK4(f, t_i, h, network, dfdt);
+	// If h is larger than t_f-t_i, it just recalculate abundances with RK4
+	if(h > t_f-t_i){
+		h = t_f-t_i;
+		f_tmp = RK4(f, t_i, h, network, dfdt);
 	}
-
 	cursor = network.node_list->head; i = 0;
 	while(cursor->next != NULL){
 		cursor = cursor->next;
-		for(j=0; j<cursor->degree; j++) if(cursor->direction[j] < 0){
-			k = -1; while(index_list[++k] != cursor->neighbors[j]);
-			if(cursor->sign[j] > 0) values[i][1] += cursor->sign[j] * x_list[k];
-			else values[i][2] += cursor->sign[j] * x_list[k];
-		}
-		values[i++][0] = sum_ab;
-	}
+		cursor->abundance = f_tmp[i]; i++;
+	} cursor = NULL;
 
-	Adaptive_RK4_h(x_list, network.nodes, 0, h, values, differential_eq_of_x);
-	// if h is larger than t_f-t_i, it just recalculate abundances with RK4
-	if(h > t_f-t_i){
-		h = t_f-t_i;
-		cursor = network.node_list->head; i = 0;
-		while(cursor->next != NULL){
-			cursor = cursor->next;
-			cursor->abundance = RK4(cursor->abundance, 0, h, values[i++], differential_eq_of_x);
-		}
-	}
-	else{
-		cursor = network.node_list->head; i = 0;
-		while(cursor->next != NULL){
-			cursor = cursor->next;
-			cursor->abundance = x_list[i++];
-		}
-	} cursor = NULL; free(cursor);
-	free(index_list); free(x_list);
-	for(i=0; i<network.nodes; i++) free(values[i]);
-	free(values);
+	// // RK4
+	// if(h > t_f-t_i) h = t_f-t_i;
+	// else h = 1./paras.alpha;
+	// f_tmp = RK4(f, t_i, h, network, dfdt);
+	// cursor = network.node_list->head; i = 0;
+	// while(cursor->next != NULL){
+	// 	cursor = cursor->next;
+	// 	cursor->abundance = f_tmp[i]; i++;
+	// } cursor = NULL; 
+
+	free(f); free(f_tmp); free(cursor);
 }
 
 void appear_new_node(Network& network, Parameters& paras)
@@ -356,10 +336,42 @@ void remove_a_node(double t, Network& network, Parameters& paras)
 	cursor1 = NULL; free(cursor1);
 }
 
-double differential_eq_of_x(double x, double t, double *values)
+double *dfdt(double *f, double t, Network network)
 {
-	// \dot{f_i} = f_i (1 - \sum{f_i}) (\sum{w_{ij}^+ f_i}}) + (\sum{w_{ij}^- f_i}})
-	return x*((1.-values[0])*values[1]+values[2]);
+	int i, j, k;
+		
+	// the summation of all abundances
+	double f_sum = 0.;
+	for(i=0; i<network.nodes; i++) f_sum += f[i];
+
+	// the calculation of growth rate G_i and death rate D_i
+	// The calloc() function in C is used to allocate 
+	// a specified amount of memory and then initialize it to zero.
+	double *G = (double *) calloc(network.nodes, sizeof(double));
+	double *D = (double *) calloc(network.nodes, sizeof(double));
+	int *index = (int *) calloc(network.nodes, sizeof(int)); 
+	Node *cursor = network.node_list->head; i = 0;
+	while(cursor->next != NULL){
+		cursor = cursor->next;
+		index[i] = cursor->node_name;
+		G[i] = cursor->self_loop * f[i]; i++;
+	}
+	cursor = network.node_list->head; i = 0;
+	while(cursor->next != NULL){
+		cursor = cursor->next;
+		for(j=0; j<cursor->degree; j++) if(cursor->direction[j] < 0){
+			k = -1; while(index[++k] != cursor->neighbors[j]);
+			if(cursor->sign[j] > 0) G[i] += cursor->sign[j] * f[k];
+			else D[i] += cursor->sign[j] * f[k];
+		} i++;
+	} cursor = NULL;
+
+	// df/dt array
+	double *df = (double *) calloc(network.nodes, sizeof(double));
+	for(i=0; i<network.nodes; i++) df[i] = f[i]*(G[i]*(1-f_sum)+D[i]);
+
+	free(G); free(D); free(index); free(cursor);
+	return df;
 }
 
 void save_parameters(Parameters& paras, char *path)
