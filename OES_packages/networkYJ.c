@@ -1,6 +1,6 @@
 /*
 	This code is a collection of fucntions
-	for calculating the standard score of motifs.
+	for making network and calculating Ordinary differential equations.
 
 	It was written by Youngjai in June 20, 2022.
 */
