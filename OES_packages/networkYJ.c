@@ -2,12 +2,11 @@
 	This code is a collection of fucntions
 	for calculating the standard score of motifs.
 
-	It was written by Youngjai in Oct. 12, 2020.
+	It was written by Youngjai in June 20, 2022.
 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <time.h>
 
 typedef struct {
 	struct __node *head;
@@ -34,8 +33,8 @@ typedef struct {
 
 typedef struct {
 	int N0; // the number of initial nodes in the system
-	double y_th; // the minimum abundance density
-	double y0; // the initial abundnace density of each node (scaled by carrying capacity K)
+	double f_th; // the minimum abundance density
+	double f0; // the initial abundnace density of each node (scaled by carrying capacity K)
 	int m; // the number of initial interaction with the residents
 	double sigma; // the standard deviation of interaction weight distribution
 	double alpha; // the rate of a new node
@@ -50,174 +49,11 @@ typedef struct {
 void init_genrand(unsigned long s);
 double genrand_real2(void);
 
-clock_t time_begin(char *path)
-{	
-	clock_t begin = clock();
-	FILE *log = fopen(path, "wt");
-	fprintf(log, "Log file is opened by youngjai.\r\n");
-	fclose(log);
-
-	return begin;
-}
-
-void time_end(clock_t begin, char *path)
-{
-	FILE *log = fopen(path, "at");
-	clock_t end = clock();
-	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC; /* unit : second */
-	int dd, hh, mm;
-	double ss;
-	dd = time_spent/86400;
-	hh = (time_spent-dd*86400)/3600;
-	mm = (time_spent-dd*86400-hh*3600)/60;
-	ss = time_spent-dd*86400-hh*3600-mm*60;
-
-	fprintf(log, "\r\nThe runing time is %d days %02d hours %02d minutes %02.4lf seconds.\r\n", dd, hh, mm, ss);
-	fclose(log);
-}
-
-void swap_two_integers(int *num_i, int *num_j)
-{
-	int temp = *num_i;	/* temporary storage */
-	*num_i = *num_j; 
-	*num_j = temp;
-}
-
-void swap_two_floats(double *num_i, double *num_j)
-{
-	double temp = *num_i;	/* temporary storage */
-	*num_i = *num_j; 
-	*num_j = temp;
-}
-
-int call = 0;
-double normal_dist(double avg, double stdev, unsigned long seed)
-{
-	init_genrand(seed);
-	/* generate a number from the normal distribution. */
-	double v1, v2, s, temp;
-	static double x1, x2;
-	// static int call = 0;
-
-	if(call == 1){
-		call = !call;
-		return (avg + stdev * (double) x2);
-	}
-
-	do{
-		v1 = 2. * genrand_real2() - 1.;
-		v2 = 2. * genrand_real2() - 1.;
-		s = v1 * v1 + v2 * v2;
-	} while(s >= 1. || s == 0.);
-
-	temp = sqrt((-2. * log(s)) / s);
-	x1 = v1 * temp;
-	x2 = v2 * temp;
-
-	call = !call;
-
-	return (avg + stdev * (double) x1);
-}
-
-int *shuffle_array_int(int length, unsigned long seed)
-{
-	init_genrand(seed);
-	int i, j;
-	int *shuffle = (int *) calloc(length+1, sizeof(int));
-	for(i=0; i<length; i++) shuffle[i] = i;
-
-	for(i=length-1; i>0; i--){
-		j = (int) ((i+1)*genrand_real2());
-		swap_two_integers(&shuffle[i], &shuffle[j]);
-	}
-	return shuffle;
-}
-
-double *RK4(double *f, double t, double h, Network network, double *(*dfdt)(double *, double, Network))
-{
-	int i;
-	double h2 = 0.5*h;
-
-	double **k = (double **) calloc(4, sizeof(double *));
-
-	// RK4
-	// k1 = f(x,t)
-	// k2 = f(x+h2*k1, t+h2)
-	// k3 = f(x+h2*k2, t+h2)
-	// k4 = f(x+h*k3, t+h)
-	// x += h/6 * (k1 + 2k2 + 2k3 + k4)
-	double *f_rk4 = (double *) calloc(network.nodes, sizeof(double));
-
-	// k1
-	k[0] = dfdt(f, t, network);
-
-	// k2
-	for(i=0; i<network.nodes; i++) f_rk4[i] = f[i]+h2*k[0][i];
-	k[1] = dfdt(f_rk4, t+h2, network);
-
-	// k3
-	for(i=0; i<network.nodes; i++) f_rk4[i] = f[i]+h2*k[1][i];
-	k[2] = dfdt(f_rk4, t+h2, network);
-
-	// k4
-	for(i=0; i<network.nodes; i++) f_rk4[i] = f[i]+h*k[2][i];
-	k[3] = dfdt(f_rk4, t+h, network);
-
-	// RK4 array
-	for(i=0; i<network.nodes; i++)
-		f_rk4[i] = f[i] + h/6.*(k[0][i]+2.*k[1][i]+2.*k[2][i]+k[3][i]);
-
-	for(i=0; i<4; i++) free(k[i]);
-	free(k);
-
-	return f_rk4;
-}
-
-double *Adaptive_RK4(double *f, double t, double &h, Network network, double *(*dfdt)(double *, double, Network))
-{
-	int i;
-	double *f1 = NULL;
-	double *f_tmp, *f2;
-	double f_del;
-	double rho = 0.;
-	// If the difference between two results is less than 'precision', these are same.
-	double acc = 1e-8; // target accuracy
-	double pre = 1e-14; // 소수 14번째 자리까지 정도 확인
-
-	while(rho<1.-pre){
-		f_del = 0.; 
-
-		if(f1 != NULL){ delete f1; delete f_tmp; delete f2; }
-		f_tmp = RK4(f, t, h, network, dfdt);
-		f1 = RK4(f_tmp, t+h, h, network, dfdt);
-		f2 = RK4(f, t+2.*h, 2.*h, network, dfdt);
-
-		// To measure the Euclidean distance in f dynamics space
-		for(i=0; i<network.nodes; i++) f_del += (f1[i]-f2[i])*(f1[i]-f2[i]);
-		f_del = sqrt(f_del);
-
-		// If f_del is too small, we replace f_del as precision.
-		if(f_del < pre){ 
-			rho = 10.; h *= 2.;
-		}
-		else{
-			// If f_del is diverse, we replace f_del as one over precision.
-			if((isnan(f_del)) || (isinf(f_del))) f_del = 1./pre;
-			rho = 30.*h*acc/f_del;
-
-			if(rho<1.-pre) h *= pow(rho, 0.25);
-			else h *= 2.;
-		}
-	}
-
-	// adaptive RK4 array
-	double *f_adap = (double *) calloc(network.nodes, sizeof(double));
-	for(i=0; i<network.nodes; i++) f_adap[i] = f1[i] + (f1[i]-f2[i])/15.;
-
-	free(f1); free(f_tmp); free(f2);
-
-	return f_adap;
-}
+// from youngjai_packages.c
+double normal_dist(double avg, double stdev, unsigned long seed);
+int *shuffle_array_int(int length, unsigned long seed);
+void swap_two_integers(int *num_i, int *num_j);
+void swap_two_floats(double *num_i, double *num_j);
 
 void free_node_list(Node_list *&node_list)
 {
@@ -241,7 +77,7 @@ void create_node(Network& network, Parameters& paras)
 {
 	Node *new_node = (Node *) calloc(1, sizeof(Node));
 	new_node->node_name = network.node_label++;
-	new_node->abundance = paras.y0;
+	new_node->abundance = paras.f0;
 	new_node->degree = 0;
 	new_node->neighbors = (int *) calloc((6*paras.m), sizeof(int));
 	new_node->direction = (int *) calloc((6*paras.m), sizeof(int));
@@ -365,4 +201,90 @@ void initial_SPP_network(Network& network, Parameters& paras)
 		if(name_i != name_j) create_connection(network, paras, ++name_i, ++name_j);
 	}
 	free(shuffled);
+}
+
+double *RK4(double *f, double t, double h, Network network, double *(*dfdt)(double *, double, Network))
+{
+	int i;
+	double h2 = 0.5*h;
+
+	double **k = (double **) calloc(4, sizeof(double *));
+
+	// RK4
+	// k1 = f(x,t)
+	// k2 = f(x+h2*k1, t+h2)
+	// k3 = f(x+h2*k2, t+h2)
+	// k4 = f(x+h*k3, t+h)
+	// x += h/6 * (k1 + 2k2 + 2k3 + k4)
+	double *f_rk4 = (double *) calloc(network.nodes, sizeof(double));
+
+	// k1
+	k[0] = dfdt(f, t, network);
+
+	// k2
+	for(i=0; i<network.nodes; i++) f_rk4[i] = f[i]+h2*k[0][i];
+	k[1] = dfdt(f_rk4, t+h2, network);
+
+	// k3
+	for(i=0; i<network.nodes; i++) f_rk4[i] = f[i]+h2*k[1][i];
+	k[2] = dfdt(f_rk4, t+h2, network);
+
+	// k4
+	for(i=0; i<network.nodes; i++) f_rk4[i] = f[i]+h*k[2][i];
+	k[3] = dfdt(f_rk4, t+h, network);
+
+	// RK4 array
+	for(i=0; i<network.nodes; i++)
+		f_rk4[i] = f[i] + h/6.*(k[0][i]+2.*k[1][i]+2.*k[2][i]+k[3][i]);
+
+	for(i=0; i<4; i++) free(k[i]);
+	free(k);
+
+	return f_rk4;
+}
+
+double *Adaptive_RK4(double *f, double t, double &h, Network network, double *(*dfdt)(double *, double, Network))
+{
+	int i;
+	double *f1 = NULL;
+	double *f_tmp, *f2;
+	double f_del;
+	double rho = 0.;
+	// If the difference between two results is less than 'precision', these are same.
+	double acc = 1e-8; // target accuracy
+	double pre = 1e-14; // 소수 14번째 자리까지 정도 확인
+
+	while(rho<1.-pre){
+		f_del = 0.; 
+
+		if(f1 != NULL){ delete f1; delete f_tmp; delete f2; }
+		f_tmp = RK4(f, t, h, network, dfdt);
+		f1 = RK4(f_tmp, t+h, h, network, dfdt);
+		f2 = RK4(f, t+2.*h, 2.*h, network, dfdt);
+
+		// To measure the Euclidean distance in f dynamics space
+		for(i=0; i<network.nodes; i++) f_del += (f1[i]-f2[i])*(f1[i]-f2[i]);
+		f_del = sqrt(f_del);
+
+		// If f_del is too small, we replace f_del as precision.
+		if(f_del < pre){ 
+			rho = 10.; h *= 2.;
+		}
+		else{
+			// If f_del is diverse, we replace f_del as one over precision.
+			if((isnan(f_del)) || (isinf(f_del))) f_del = 1./pre;
+			rho = 30.*h*acc/f_del;
+
+			if(rho<1.-pre) h *= pow(rho, 0.25);
+			else h *= 2.;
+		}
+	}
+
+	// adaptive RK4 array
+	double *f_adap = (double *) calloc(network.nodes, sizeof(double));
+	for(i=0; i<network.nodes; i++) f_adap[i] = f1[i] + (f1[i]-f2[i])/15.;
+
+	free(f1); free(f_tmp); free(f2);
+
+	return f_adap;
 }
