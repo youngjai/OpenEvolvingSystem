@@ -1,13 +1,13 @@
 /*
-	This code is a collection of fucntions
-	for calculating the standard score of motifs.
+	This code is Lotka-Volterra type Dyanmics
+	to describe an Open evolving system.
 
-	It was written by Youngjai in Feb. 18, 2021.
+	It was written by Youngjai in June 20, 2022.
 
 	input variables
 	date(yymmdd), sigma, mutant event time, saturation time, dt(K), alpha (m=5, alpha=0.1)
 
-	* x_i/K -> y_i , y_th = 1/K, y_0 = 10*y_th (To remove the carrying capacity)
+	* x_i/K -> f_i , f_th = 1/K, f_0 = 10*f_th (To reduce the carrying capacity)
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,8 +42,8 @@ typedef struct {
 typedef struct {
 	int N0; // the number of initial nodes in the system
 	int K; // the carring capacity
-	double y_th; // the minimum abundance density
-	double y0; // the initial abundnace density of each node (scaled by carrying capacity K)
+	double f_th; // the minimum abundance density
+	double f0; // the initial abundnace density of each node (scaled by carrying capacity K)
 	int m; // the number of initial interaction with the residents
 	double sigma; // the standard deviation of interaction weight distribution
 	double alpha; // the rate of a new node
@@ -99,7 +99,7 @@ int main(int argc, char **argv)
 
 	// Input the initial parameters
 	Parameters paras;
-	paras.N0 = 100; paras.y_th = 1./atof(argv[5]); paras.y0 = 10.*paras.y_th;
+	paras.N0 = 100; paras.f_th = 1./atof(argv[5]); paras.f0 = 10.*paras.f_th;
 	paras.sigma = pow(10, atof(argv[2])*0.5); paras.m = 5; 
 	paras.alpha = pow(10, atof(argv[6]));
 	paras.mutant_event_time = atoi(argv[3]); paras.saturation_time = atoi(argv[4]);
@@ -163,7 +163,7 @@ void simul_SPP_model(Parameters& paras, double **&results, double **&network_edg
 	j = 0;
 	// abundance time series region is from 1 to end
 	initial_SPP_network(network, paras);
-	for(i=0; i<paras.N0; i++) results[i][1] = paras.y0;
+	for(i=0; i<paras.N0; i++) results[i][1] = paras.f0;
 	cursor = network.node_list->head;
 	while(cursor->next != NULL){
 		cursor = cursor->next;
@@ -305,7 +305,7 @@ void remove_a_node(double t, Network& network, Parameters& paras)
 	Node *cursor1;
 
 	while(cursor->next != NULL){
-		if(cursor->next->abundance < paras.y_th){
+		if(cursor->next->abundance < paras.f_th){
 			for(i=0; i<cursor->next->degree; i++){
 				cursor1 = network.node_list->head->next;
 				while(cursor1->node_name != cursor->next->neighbors[i])
@@ -378,8 +378,8 @@ void save_parameters(Parameters& paras, char *path)
 {
 	FILE *file = fopen(path, "at");
 	fprintf(file, "N0 : %d\n", paras.N0);
-	fprintf(file, "y_th : %.2le\n", paras.y_th);
-	fprintf(file, "y0 : %.2le\n", paras.y0);
+	fprintf(file, "f_th : %.2le\n", paras.f_th);
+	fprintf(file, "f0 : %.2le\n", paras.f0);
 	fprintf(file, "m : %d\n", paras.m);
 	fprintf(file, "sigma : %.2le\n", paras.sigma);
 	fprintf(file, "alpha : %.2le\n", paras.alpha);
