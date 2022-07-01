@@ -8,7 +8,7 @@ In the model, a new species appears in the system at an interval time.
 The dynamics of our model follows as the Lotka-Volterra type equation.
 The equation is given by
 
-![equation]([https://latex.codecogs.com/gif.latex?%5Cfrac%7Bd%7Bx_i%7D%7D%7Bdt%7D%3DG_i%28%5Cmathbf%7Bx%7D%29%5C%3Ax_i%5Cleft%281-%5CSigma_jx_j/K%5Cright%29&plus;D_i%28%5Cmathbf%7Bx%7D%29%5C%3Ax_i%20%5C%3B%5C%3B.](https://latex.codecogs.com/svg.image?\frac{df_i}{dt}&space;=&space;G_i(\textbf{f})f_i\left(1-\frac{\sum&space;f_j}{K}\right)&plus;D_i(\textbf{f})f_i))
+![equation](https://latex.codecogs.com/gif.image?\dpi{110}\frac{df_i}{dt}&space;=&space;G_i(\textbf{f})f_i\left(1-\frac{\sum&space;f_j}{K}\right)&plus;D_i(\textbf{f})f_i)
 
 where x_i is an abundance of ith species, G_i and D_i are the growth and death rates depending on the interaction structure of ith species, respectively.
 Especially, the species living in the model share resources which are limited such as habitat and water resources, so-called Resource Limitation, K.
