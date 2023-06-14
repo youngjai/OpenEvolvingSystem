@@ -1,0 +1,9 @@
+cff-version: 0.1.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Park
+    given-names: Youngjai
+    orcid: https://orcid.org/0000-0002-1727-1996
+title: Open evolving ecological model
+version: 0.1.0
+date-released: 2023-06-14
